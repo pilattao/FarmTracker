@@ -103,4 +103,33 @@ public class RunTrackerTests
         Assert.Equal(8, run.CostEx);
         Assert.Equal(8, t.Session.CostEx);
     }
+
+    [Fact]
+    public void Consecutive_maps_increment_run_index()
+    {
+        var t = new RunTracker();
+        t.StartSession(T0);
+        t.OnAreaEntered(true, "Mesa", T0, 5);
+        Assert.Equal(1, t.CurrentRun!.Index);
+        t.OnAreaEntered(false, "Hideout", T0.AddMinutes(6), 5);   // close run 1
+        t.OnAreaEntered(true, "Crypt", T0.AddMinutes(10), 5);     // open run 2
+        Assert.Equal(2, t.CurrentRun!.Index);
+        t.OnAreaEntered(false, "Hideout", T0.AddMinutes(16), 5);  // close run 2
+        Assert.Equal(2, t.Session.Runs.Count);
+        Assert.Equal(1, t.Session.Runs[0].Index);
+        Assert.Equal(2, t.Session.Runs[1].Index);
+    }
+
+    [Fact]
+    public void Spend_between_maps_accrues_to_session_only_with_null_map()
+    {
+        var t = new RunTracker();
+        t.StartSession(T0);
+        t.Apply(Spent(4), T0);                        // spent in town, no active run
+        Assert.Equal(4, t.Session.SpentEx);
+        Assert.Null(t.CurrentRun);
+        var entry = Assert.Single(t.Session.Loot);
+        Assert.Null(entry.MapIndex);
+        Assert.Equal(LootKind.Spent, entry.Kind);
+    }
 }
