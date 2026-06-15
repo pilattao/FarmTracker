@@ -80,4 +80,55 @@ public class RunTrackerTests
         Assert.Equal(8, run.CostEx);
         Assert.Equal(8, t.Session.CostEx);
     }
+
+    [Fact]
+    public void StopSession_books_the_active_run()
+    {
+        var t = new RunTracker();
+        t.StartSession(T0);
+        t.OnAreaEntered(true, "Mesa", T0, 5);
+        t.AddIncome(30);
+        t.StopSession(T0.AddMinutes(7));
+        Assert.Null(t.CurrentRun);
+        var run = Assert.Single(t.Session.Runs);
+        Assert.Equal(30, run.IncomeEx);
+        Assert.Equal(5, run.CostEx);
+        Assert.Equal(5, t.Session.CostEx);
+        Assert.Equal(T0.AddMinutes(7), t.Session.EndUtc);
+    }
+
+    [Fact]
+    public void SetRunCost_on_active_run_does_not_double_book_at_close()
+    {
+        var t = new RunTracker();
+        t.StartSession(T0);
+        t.OnAreaEntered(true, "Mesa", T0, 5);
+        t.SetRunCost(t.CurrentRun!, 8);
+        t.OnAreaEntered(false, "Hideout", T0.AddMinutes(6), 5);
+        Assert.Equal(8, t.Session.Runs[0].CostEx);
+        Assert.Equal(8, t.Session.CostEx);
+    }
+
+    [Fact]
+    public void AddIncome_ignores_non_positive_amounts()
+    {
+        var t = new RunTracker();
+        t.StartSession(T0);
+        t.OnAreaEntered(true, "Mesa", T0, 5);
+        t.AddIncome(0);
+        t.AddIncome(-5);
+        Assert.Equal(0, t.Session.IncomeEx);
+        Assert.Equal(0, t.CurrentRun!.IncomeEx);
+    }
+
+    [Fact]
+    public void Run_index_increments_across_closed_runs()
+    {
+        var t = new RunTracker();
+        t.StartSession(T0);
+        t.OnAreaEntered(true, "Mesa", T0, 5);
+        t.OnAreaEntered(true, "Vaal", T0.AddMinutes(5), 5);
+        Assert.Equal(1, t.Session.Runs[0].Index);
+        Assert.Equal(2, t.CurrentRun!.Index);
+    }
 }
