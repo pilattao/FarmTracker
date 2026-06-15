@@ -81,7 +81,7 @@ public class FarmTracker : BaseSettingsPlugin<Settings>
         var stats = SessionStats.Compute(_tracker.Session, now);
         var show = true;
         _window.Draw(_tracker, stats, _bridge.DivinePerExalted, _bridge.IsAvailable, _bridge.PricesReady,
-                     Settings, now, onStart: () => StartSession(now), onStop: () => _tracker.StopSession(now),
+                     Settings, now, onStart: () => StartSession(now), onStop: () => StopSession(now),
                      onReset: () => StartSession(now), ref show);
         if (!show) Settings.ShowWindow.Value = false;
     }
@@ -92,5 +92,11 @@ public class FarmTracker : BaseSettingsPlugin<Settings>
         _accumulator.Reset();
         _needSeed = true;
         _sessionActive = true;
+    }
+
+    private void StopSession(DateTime now)
+    {
+        _tracker.StopSession(now);
+        _sessionActive = false;
     }
 }
