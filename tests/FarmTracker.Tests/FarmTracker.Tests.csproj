@@ -10,6 +10,7 @@
     <Compile Include="..\..\Model\RunRecord.cs" Link="Model\RunRecord.cs" />
     <Compile Include="..\..\Model\Session.cs" Link="Model\Session.cs" />
     <Compile Include="..\..\Tracking\LootAccumulator.cs" Link="Tracking\LootAccumulator.cs" />
+    <Compile Include="..\..\Tracking\RunTracker.cs" Link="Tracking\RunTracker.cs" />
     <Compile Include="*.cs" />
   </ItemGroup>
   <ItemGroup>
