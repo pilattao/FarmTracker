@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\Formatting\CurrencyFormat.cs" Link="Formatting\CurrencyFormat.cs" />
+    <Compile Include="..\..\Model\LootEntry.cs" Link="Model\LootEntry.cs" />
     <Compile Include="..\..\Model\RunRecord.cs" Link="Model\RunRecord.cs" />
     <Compile Include="..\..\Model\Session.cs" Link="Model\Session.cs" />
     <Compile Include="..\..\Tracking\LootAccumulator.cs" Link="Tracking\LootAccumulator.cs" />
