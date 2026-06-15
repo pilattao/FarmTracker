@@ -11,6 +11,7 @@
     <Compile Include="..\..\Model\Session.cs" Link="Model\Session.cs" />
     <Compile Include="..\..\Tracking\LootAccumulator.cs" Link="Tracking\LootAccumulator.cs" />
     <Compile Include="..\..\Tracking\RunTracker.cs" Link="Tracking\RunTracker.cs" />
+    <Compile Include="..\..\Aggregation\SessionStats.cs" Link="Aggregation\SessionStats.cs" />
     <Compile Include="*.cs" />
   </ItemGroup>
   <ItemGroup>
