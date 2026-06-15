@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using ExileCore2;
 using ExileCore2.PoEMemory.Components;
+using ExileCore2.Shared.Enums;          // ItemRarity
 using FarmTracker.Pricing;
 
 namespace FarmTracker.Tracking;
 
-/// <summary>Builds a per-tick inventory snapshot (id, stack size, unit exalted value) from the player
-/// inventory, applying a minimum-value filter. ExileCore-dependent; the pure accumulator consumes it.</summary>
+/// <summary>Builds the per-tick inventory snapshot (id, stack size, unit value, name, icon path,
+/// category) from the player inventory. The snapshot is UNFILTERED (all ids) so the accumulator can
+/// detect consumption/disappearance; the min-value threshold is applied later, in the accumulator's
+/// Picked path / the UI. ExileCore-dependent.</summary>
 public sealed class InventoryReader
 {
     private readonly GameController _gc;
@@ -21,7 +24,7 @@ public sealed class InventoryReader
         _logError = logError;
     }
 
-    public IReadOnlyList<InventorySlotSnapshot> Snapshot(float minValueEx)
+    public IReadOnlyList<InventorySlotSnapshot> Snapshot()
     {
         var result = new List<InventorySlotSnapshot>();
         try
@@ -37,13 +40,15 @@ public sealed class InventoryReader
 
                 var size = e.TryGetComponent<Stack>(out var st) ? Math.Max(1, st.Size) : 1;
                 var stackValue = _bridge.ExaltedValueOfStack(e);
-                if (stackValue < minValueEx) continue;   // below-threshold noise (e.g. scrolls)
 
                 result.Add(new InventorySlotSnapshot
                 {
                     Id = e.Id,
                     Size = size,
                     UnitValueEx = size > 0 ? stackValue / size : stackValue,
+                    Name = ResolveName(e),
+                    IconPath = e.TryGetComponent<RenderItem>(out var ri) ? (ri.ResourcePath ?? "") : "",
+                    Category = ResolveCategory(e),
                 });
             }
         }
@@ -52,5 +57,37 @@ public sealed class InventoryReader
             _logError($"inventory read error: {ex.Message}");
         }
         return result;
+    }
+
+    private string ResolveName(ExileCore2.PoEMemory.MemoryObjects.Entity e)
+    {
+        try
+        {
+            var bit = _gc.Files.BaseItemTypes.Translate(e.Path);
+            return bit?.BaseName ?? "";
+        }
+        catch { return ""; }
+    }
+
+    private string ResolveCategory(ExileCore2.PoEMemory.MemoryObjects.Entity e)
+    {
+        try
+        {
+            if (e.TryGetComponent<Mods>(out var mods))
+            {
+                switch (mods.ItemRarity)
+                {
+                    case ItemRarity.Unique: return "unique";
+                    case ItemRarity.Rare:   return "rare";
+                    case ItemRarity.Magic:  return "magic";
+                }
+            }
+            var cls = _gc.Files.BaseItemTypes.Translate(e.Path)?.ClassName ?? "";
+            if (cls.Contains("Currency")) return "currency";
+            if (cls.Contains("Map")) return "map";
+            if (cls.Contains("Gem")) return "gem";
+            return "currency";   // stackable drops default; tuned in-game
+        }
+        catch { return ""; }
     }
 }
