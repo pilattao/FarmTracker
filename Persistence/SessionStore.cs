@@ -35,12 +35,22 @@ public sealed class SessionStore
         catch (Exception ex) { _logError($"session save failed: {ex.Message}"); }
     }
 
+    /// <summary>Loads all persisted sessions newest-first, skipping corrupt files. SIDE EFFECT: prunes
+    /// excess session files on disk down to <paramref name="cap"/> and removes any orphaned .tmp files
+    /// left by an interrupted Save.</summary>
     public List<Session> LoadAll(int cap)
     {
         var result = new List<Session>();
         try
         {
             if (!Directory.Exists(_dir)) return result;
+
+            foreach (var tmp in Directory.GetFiles(_dir, "*.tmp"))
+            {
+                try { File.Delete(tmp); }
+                catch (Exception ex) { _logError($"skip orphan temp {Path.GetFileName(tmp)}: {ex.Message}"); }
+            }
+
             foreach (var f in Directory.GetFiles(_dir, "*.json"))
             {
                 try

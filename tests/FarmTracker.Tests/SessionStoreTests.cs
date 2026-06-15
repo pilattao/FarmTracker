@@ -70,4 +70,19 @@ public class SessionStoreTests
         var loaded = store.LoadAll(50);
         Assert.Single(loaded);   // corrupt one skipped, good one kept
     }
+
+    [Fact]
+    public void LoadAll_removes_orphaned_temp_files()
+    {
+        var dir = TempDir();
+        var sessions = Path.Combine(dir, "sessions");
+        Directory.CreateDirectory(sessions);
+        File.WriteAllText(Path.Combine(sessions, "20260616-090000.json.tmp"), "partial write");
+        var store = new SessionStore(dir, _ => { });
+        store.Save(Sess(new DateTime(2026, 6, 16, 10, 0, 0, DateTimeKind.Utc), 5));
+
+        var loaded = store.LoadAll(50);
+        Assert.Single(loaded);
+        Assert.Empty(Directory.GetFiles(sessions, "*.tmp"));   // orphan temp swept
+    }
 }
