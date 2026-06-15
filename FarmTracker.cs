@@ -58,17 +58,21 @@ public class FarmTracker : BaseSettingsPlugin<Settings>
             Settings.ShowWindow.Value = !Settings.ShowWindow.Value;
 
         if (!GameController.InGame || !_sessionActive) return;
-        if (!_bridge.IsAvailable || !_bridge.PricesReady) return;
 
-        var snapshot = _reader.Snapshot(Settings.MinItemValueEx.Value);
+        // Seed the baseline as early as possible — at session start, before NinjaPricer prices load —
+        // so loot already in your bags is recorded as not-income and pre-session inventory is captured
+        // before you start looting. Seeding only needs item ids/sizes, not values, so it runs
+        // independent of the prices gate and uses an unfiltered snapshot (min value 0) to capture every id.
         if (_needSeed)
         {
-            _accumulator.SeedBaseline(snapshot);   // existing inventory is not income
+            _accumulator.SeedBaseline(_reader.Snapshot(0f));
             _needSeed = false;
             return;
         }
 
-        var delta = _accumulator.Accumulate(snapshot);
+        if (!_bridge.IsAvailable || !_bridge.PricesReady) return;
+
+        var delta = _accumulator.Accumulate(_reader.Snapshot(Settings.MinItemValueEx.Value));
         _tracker.AddIncome(delta.GainedEx);
         _tracker.AddUnpriced(delta.NewUnpriced);
     }
