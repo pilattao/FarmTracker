@@ -48,6 +48,21 @@ public class SessionStatsTests
     }
 
     [Fact]
+    public void In_map_time_is_clamped_to_elapsed_when_runs_exceed_wall_clock()
+    {
+        // A run whose EndUtc runs past the session end (e.g. nowUtc earlier than run end, or overlapping data):
+        // inMap would be 60 min but the session window is only 30 min -> clamp to elapsed, outMap -> 0.
+        var s = new Session { StartUtc = T0, IncomeEx = 30 };
+        s.Runs.Add(new RunRecord { StartUtc = T0, EndUtc = T0.AddMinutes(60), IncomeEx = 30 });
+        var r = SessionStats.Compute(s, activeRun: null, T0.AddMinutes(30));
+        Assert.Equal(1800, r.ElapsedSeconds, 0);
+        Assert.Equal(1800, r.InMapSeconds, 0);     // clamped down from 3600
+        Assert.Equal(0, r.OutOfMapSeconds, 0);
+        // effective == raw here because inMap was clamped to the full elapsed window
+        Assert.Equal(r.ProfitPerHourEx, r.EffectiveProfitPerHourEx, 3);
+    }
+
+    [Fact]
     public void Zero_time_and_zero_maps_are_safe()
     {
         var r = SessionStats.Compute(new Session { StartUtc = T0 }, null, T0);
