@@ -141,4 +141,39 @@ public class LootAccumulatorTests
         var r = new LootResult { GainedEx = 3, Events = new List<LootEvent> { new() { Count = 1, UnitValueEx = 0.1, Kind = LootKind.Picked } } };
         Assert.Same(r, LootAccumulator.ApplyMinValue(r, 0));
     }
+
+    [Fact]
+    public void Partial_in_map_spend_then_out_of_map_dump_does_not_recount_on_repull()
+    {
+        // Pick 10 in-map, spend 6 in-map (high-water -> 4), then dump remaining out-of-map and re-pull.
+        var a = new LootAccumulator();
+        a.SeedBaseline(Array.Empty<InventorySlotSnapshot>());
+        Assert.Equal(10, a.Accumulate(new[] { S(1, 10, 1) }, inMap: true).GainedEx);
+        Assert.Equal(6, a.Accumulate(new[] { S(1, 4, 1) }, inMap: true).SpentEx);   // spent 6, high-water now 4
+        // leave the map; dump the remaining 4 to stash -> ignored (no spend, id retained at high-water 4)
+        var dump = a.Accumulate(Array.Empty<InventorySlotSnapshot>(), inMap: false);
+        Assert.Equal(0, dump.SpentEx);
+        Assert.Empty(dump.Events);
+        // re-pull the same id out of map: at/below the retained high-water (4) -> not recounted
+        Assert.Equal(0, a.Accumulate(new[] { S(1, 4, 1) }, inMap: false).GainedEx);
+    }
+
+    [Fact]
+    public void ApplyMinValue_threshold_is_on_whole_pickup_value_not_per_unit()
+    {
+        // 10 units at 0.08 ex each = 0.8 total < 1.0 -> dropped, even though it's a multi-unit pickup.
+        var r = new LootResult
+        {
+            GainedEx = 0.8,
+            Events = new List<LootEvent>
+            {
+                new() { Count = 10, UnitValueEx = 0.08, Kind = LootKind.Picked, Name = "Wisdom" }, // 0.8 total -> drop
+                new() { Count = 5,  UnitValueEx = 0.30, Kind = LootKind.Picked, Name = "Alch" },    // 1.5 total -> keep
+            }
+        };
+        var f = LootAccumulator.ApplyMinValue(r, 1.0);
+        Assert.Equal(1.5, f.GainedEx, 3);
+        Assert.Equal(1, f.Events.Count);
+        Assert.Equal("Alch", f.Events[0].Name);
+    }
 }
