@@ -6,6 +6,7 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\Formatting\CurrencyFormat.cs" Link="Formatting\CurrencyFormat.cs" />
     <Compile Include="*.cs" />
   </ItemGroup>
   <ItemGroup>
