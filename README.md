@@ -49,6 +49,8 @@ The plugin builds against the ExileCore2 assemblies. The reference DLLs are not 
 
 - **Session and run history are in-memory only.** They are not persisted across ExileCore2 restarts — this is intentional for v1 scope.
 - **Stop** ends the session: it freezes the rates and stops further tracking until you press **Start** or **Reset**.
+- Income is measured by a per-item high-water mark, so it never double-counts loot you dump to stash and re-pull. The tradeoff: if you spend part of a stack and later pick up more of the same stack, only the amount above your previous peak is counted — income is biased slightly downward rather than risk over-counting.
+- **Min item value to count (ex)** filters on an item's whole-stack value, not its per-unit value.
 
 ## Manual test checklist (Windows / in-game)
 

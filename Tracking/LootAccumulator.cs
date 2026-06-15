@@ -17,7 +17,10 @@ public readonly struct LootDelta
 }
 
 /// <summary>Accumulates collected loot from per-tick inventory snapshots: new entity ids and stack
-/// growth count once; dumping/re-pulling never double-counts (high-water mark per id).</summary>
+/// growth count once; dumping/re-pulling never double-counts (high-water mark per id).
+/// Known tradeoff: the high-water mark is per id, so if a stack is spent down and later regrown under
+/// the same id, only growth above the previous high is counted — this biases income slightly downward
+/// but prevents the far worse double-counting when loot is dumped to stash and re-pulled.</summary>
 public sealed class LootAccumulator
 {
     private readonly Dictionary<long, int> _counted = new();   // id → highest counted stack size
