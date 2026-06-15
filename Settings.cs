@@ -9,21 +9,24 @@ public class Settings : ISettings
 {
     public ToggleNode Enable { get; set; } = new(true);
 
-    [Menu("Show window", "Open/close the farm-tracker window.")]
+    [Menu("Show window", "Open/close the farm-tracker overlay.")]
     public ToggleNode ShowWindow { get; set; } = new(false);
 
-    [Menu("Toggle window hotkey", "Press to open/close the window. Bind it here.")]
+    [Menu("Toggle window hotkey", "Press to open/close the overlay. Bind it here.")]
     public HotkeyNodeV2 ToggleWindowHotkey { get; set; } = new HotkeyNodeV2(Keys.None);
 
-    [Menu("Map cost (ex)", "Cost subtracted from each detected map (map + scarabs/etc.).")]
+    [Menu("Expanded by default", "Show the loot log expanded when the overlay opens.")]
+    public ToggleNode ExpandedByDefault { get; set; } = new(true);
+
+    [Menu("Map cost (ex)", "Base cost subtracted from each detected map (map + scarabs/etc.).")]
     public RangeNode<float> MapCostEx { get; set; } = new(0f, 0f, 1000f);
 
-    [Menu("Min item value to count (ex)", "Ignore pickups below this value (e.g. scrolls).")]
+    [Menu("Min item value to count (ex)", "Ignore picked-up items below this value in income and the log.")]
     public RangeNode<float> MinItemValueEx { get; set; } = new(0f, 0f, 100f);
 
-    [Menu("Auto-start session on first map", "Begin a session automatically when you enter your first map.")]
-    public ToggleNode AutoStartOnFirstMap { get; set; } = new(true);
+    [Menu("Max stored sessions", "How many past sessions to keep on disk (older are pruned).")]
+    public RangeNode<int> MaxStoredSessions { get; set; } = new(50, 1, 1000);
 
-    [Menu("Debug logging", "Log area changes and a sample inventory id on tab/area change (diagnostics).")]
+    [Menu("Debug logging", "Log area changes and diagnostics.")]
     public ToggleNode DebugLogging { get; set; } = new(false);
 }
