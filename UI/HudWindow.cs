@@ -12,6 +12,11 @@ namespace FarmTracker.UI;
 /// No Start/Stop — only Reset. Loot rows use a colored dot (LootDotColor) + text.</summary>
 public sealed class HudWindow
 {
+    /// <summary>Cap on loot rows drawn per frame. The full log is persisted to disk and browsable in the
+    /// Stage 2 history panel; the live HUD only renders the most recent rows to keep per-frame work bounded
+    /// on a perpetual session that can accumulate thousands of pickups.</summary>
+    private const int MaxLootRows = 200;
+
     private bool _expanded;
     private bool _initExpand;
 
@@ -55,7 +60,8 @@ public sealed class HudWindow
                 ImGui.Separator();
                 if (ImGui.BeginChild("ft_loot", new Vector2(0, 220), ImGuiChildFlags.None, ImGuiWindowFlags.HorizontalScrollbar))
                 {
-                    for (var i = s.Loot.Count - 1; i >= 0; i--)   // newest first
+                    var floor = Math.Max(0, s.Loot.Count - MaxLootRows);
+                    for (var i = s.Loot.Count - 1; i >= floor; i--)   // newest first, capped
                     {
                         var e = s.Loot[i];
                         var col = LootDotColor.For(e.Category);
@@ -76,6 +82,8 @@ public sealed class HudWindow
                                 $"  {CurrencyFormat.ExWithDiv(e.TotalValueEx, divinePerExalted)}");
                         }
                     }
+                    if (s.Loot.Count > MaxLootRows)
+                        ImGui.TextDisabled($"... {s.Loot.Count - MaxLootRows} older pickups (full log on disk)");
                 }
                 ImGui.EndChild();
             }
