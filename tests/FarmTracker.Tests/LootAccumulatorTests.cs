@@ -49,6 +49,16 @@ public class LootAccumulatorTests
     }
 
     [Fact]
+    public void Seeded_inventory_produces_zero_income_on_identical_snapshot()
+    {
+        var a = new LootAccumulator();
+        a.SeedBaseline(new[] { S(1, 5, 10), S(2, 1, 3), S(3, 100, 0) });
+        var d = a.Accumulate(new[] { S(1, 5, 10), S(2, 1, 3), S(3, 100, 0) });
+        Assert.Equal(0, d.GainedEx);
+        Assert.Equal(0, d.NewUnpriced);
+    }
+
+    [Fact]
     public void Unpriced_new_items_are_counted_in_NewUnpriced()
     {
         var a = new LootAccumulator();

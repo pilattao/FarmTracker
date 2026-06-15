@@ -122,6 +122,17 @@ public class RunTrackerTests
     }
 
     [Fact]
+    public void AddUnpriced_accumulates_and_ignores_non_positive()
+    {
+        var t = new RunTracker();
+        t.StartSession(T0);
+        t.AddUnpriced(2);
+        t.AddUnpriced(0);
+        t.AddUnpriced(-3);
+        Assert.Equal(2, t.Session.UnpricedPickups);
+    }
+
+    [Fact]
     public void Run_index_increments_across_closed_runs()
     {
         var t = new RunTracker();

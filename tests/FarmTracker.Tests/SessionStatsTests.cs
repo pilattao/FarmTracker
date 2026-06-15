@@ -1,6 +1,7 @@
 using System;
 using FarmTracker.Aggregation;
 using FarmTracker.Model;
+using FarmTracker.Tracking;
 using Xunit;
 
 namespace FarmTracker.Tests;
@@ -29,6 +30,20 @@ public class SessionStatsTests
         var s = new Session { StartUtc = T0, EndUtc = T0.AddHours(1), IncomeEx = 100, CostEx = 0 };
         var r = SessionStats.Compute(s, T0.AddHours(5));   // now is later, but session ended at +1h
         Assert.Equal(100, r.ProfitPerHourEx, 3);
+    }
+
+    [Fact]
+    public void Active_run_is_excluded_from_map_count_but_income_counts_to_session()
+    {
+        var t = new RunTracker();
+        t.StartSession(T0);
+        t.OnAreaEntered(true, "Mesa", T0, 5);   // run open, not closed
+        t.AddIncome(40);
+        var r = SessionStats.Compute(t.Session, T0.AddHours(1));
+        Assert.Equal(0, r.MapCount);
+        Assert.Equal(0, r.MapsPerHour);
+        Assert.Equal(0, r.AvgProfitPerMapEx);
+        Assert.Equal(40, r.ProfitPerHourEx, 3);  // session income (40) over 1h, cost not yet booked
     }
 
     [Fact]
