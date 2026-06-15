@@ -13,6 +13,7 @@
     <Compile Include="..\..\Tracking\LootAccumulator.cs" Link="Tracking\LootAccumulator.cs" />
     <Compile Include="..\..\Tracking\RunTracker.cs" Link="Tracking\RunTracker.cs" />
     <Compile Include="..\..\Aggregation\SessionStats.cs" Link="Aggregation\SessionStats.cs" />
+    <Compile Include="..\..\Persistence\SessionStore.cs" Link="Persistence\SessionStore.cs" />
     <Compile Include="*.cs" />
   </ItemGroup>
   <ItemGroup>
