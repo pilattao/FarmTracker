@@ -1,11 +1,10 @@
 using System;
-using System.Collections.Generic;
 using FarmTracker.Model;
 
 namespace FarmTracker.Tracking;
 
-/// <summary>Pure run/session lifecycle. The plugin feeds it area-entered events and income deltas;
-/// it owns the Session and the active RunRecord. No ExileCore or wall-clock inside — `now` is injected.</summary>
+/// <summary>Pure perpetual-session lifecycle + loot attribution. There is no Start/Stop; the session
+/// always runs and Reset archives it into history and starts a fresh one. `now`/area are injected.</summary>
 public sealed class RunTracker
 {
     public Session Session { get; private set; } = new();
@@ -17,42 +16,58 @@ public sealed class RunTracker
         CurrentRun = null;
     }
 
-    public void StopSession(DateTime nowUtc)
-    {
-        if (CurrentRun != null) CloseRun(nowUtc);
-        Session.EndUtc = nowUtc;
-    }
-
-    /// <summary>Called on every area change. Closes the current run (if any) and starts a new one when
-    /// the entered area is a map.</summary>
     public void OnAreaEntered(bool isMap, string mapName, DateTime nowUtc, double defaultCostEx)
     {
         if (CurrentRun != null) CloseRun(nowUtc);
-        if (isMap)
+        if (isMap) OpenRun(mapName, nowUtc, defaultCostEx);
+    }
+
+    /// <summary>Apply one tick's loot result: route income/spend to the session (and active run) and
+    /// append a LootEntry per event. SpentEx is accrued live here and must NOT be re-summed on close.</summary>
+    public void Apply(LootResult result, DateTime nowUtc)
+    {
+        if (result.GainedEx != 0)
         {
-            CurrentRun = new RunRecord
+            Session.IncomeEx += result.GainedEx;
+            if (CurrentRun != null) CurrentRun.IncomeEx += result.GainedEx;
+        }
+        if (result.SpentEx != 0)
+        {
+            Session.SpentEx += result.SpentEx;
+            if (CurrentRun != null) CurrentRun.SpentEx += result.SpentEx;
+        }
+        if (result.NewUnpriced > 0) Session.UnpricedPickups += result.NewUnpriced;
+
+        var mapIndex = CurrentRun?.Index;
+        foreach (var e in result.Events)
+        {
+            Session.Loot.Add(new LootEntry
             {
-                Index = Session.Runs.Count + 1,
-                MapName = mapName ?? "",
-                StartUtc = nowUtc,
-                CostEx = defaultCostEx,
-            };
+                PickedUtc = nowUtc,
+                Name = e.Name,
+                IconPath = e.IconPath,
+                Category = e.Category,
+                Count = e.Count,
+                UnitValueEx = e.UnitValueEx,
+                MapIndex = mapIndex,
+                Kind = e.Kind,
+            });
         }
     }
 
-    public void AddIncome(double ex)
+    /// <summary>Archive the current session into history and start a fresh one. Returns the archived
+    /// session for the caller to persist. Re-opens a run if currently standing in a map.</summary>
+    public Session Reset(DateTime nowUtc, bool inMapNow, string mapName, double defaultCostEx)
     {
-        if (ex <= 0) return;
-        Session.IncomeEx += ex;
-        if (CurrentRun != null) CurrentRun.IncomeEx += ex;
+        if (CurrentRun != null) CloseRun(nowUtc);
+        Session.EndUtc = nowUtc;
+        var archived = Session;
+        Session = new Session { StartUtc = nowUtc };
+        CurrentRun = null;
+        if (inMapNow) OpenRun(mapName, nowUtc, defaultCostEx);
+        return archived;
     }
 
-    public void AddUnpriced(int n)
-    {
-        if (n > 0) Session.UnpricedPickups += n;
-    }
-
-    /// <summary>Edit a run's cost (current or completed), keeping the session cost total consistent.</summary>
     public void SetRunCost(RunRecord run, double newCost)
     {
         if (run == null) return;
@@ -60,11 +75,14 @@ public sealed class RunTracker
         run.CostEx = newCost;
     }
 
+    private void OpenRun(string mapName, DateTime nowUtc, double defaultCostEx) =>
+        CurrentRun = new RunRecord { Index = Session.Runs.Count + 1, MapName = mapName ?? "", StartUtc = nowUtc, CostEx = defaultCostEx };
+
     private void CloseRun(DateTime nowUtc)
     {
         CurrentRun!.EndUtc = nowUtc;
         Session.Runs.Add(CurrentRun);
-        Session.CostEx += CurrentRun.CostEx;
+        Session.CostEx += CurrentRun.CostEx;   // base cost booked once; SpentEx already live
         CurrentRun = null;
     }
 }

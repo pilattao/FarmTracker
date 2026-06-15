@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using ExileCore2;
 using ExileCore2.PoEMemory.MemoryObjects;
 using FarmTracker.Aggregation;
+using FarmTracker.Persistence;
 using FarmTracker.Pricing;
 using FarmTracker.Tracking;
 using FarmTracker.UI;
@@ -14,10 +16,12 @@ public class FarmTracker : BaseSettingsPlugin<Settings>
     private InventoryReader _reader = null!;
     private RunTracker _tracker = null!;
     private LootAccumulator _accumulator = null!;
-    private FarmWindow _window = null!;
+    private SessionStore _store = null!;
+    private HudWindow _window = null!;
 
-    private bool _sessionActive;
     private bool _needSeed;
+    private DateTime _lastSaveUtc = DateTime.MinValue;
+    private string _currentMapName = "Map";
 
     public override bool Initialise()
     {
@@ -25,29 +29,32 @@ public class FarmTracker : BaseSettingsPlugin<Settings>
         _reader = new InventoryReader(GameController, _bridge, msg => LogError($"[reader] {msg}"));
         _tracker = new RunTracker();
         _accumulator = new LootAccumulator();
-        _window = new FarmWindow();
+        _store = new SessionStore(ConfigDirectory, msg => LogError($"[store] {msg}"));
+        _window = new HudWindow();
+
+        _tracker.StartSession(DateTime.UtcNow);
+        _needSeed = true;
 
         Input.RegisterKey(Settings.ToggleWindowHotkey.Value);
         Settings.ToggleWindowHotkey.OnValueChanged += () => Input.RegisterKey(Settings.ToggleWindowHotkey.Value);
         return true;
     }
 
+    private bool InMapNow()
+    {
+        var area = GameController.Area?.CurrentArea;
+        return area != null && !area.IsHideout && !area.IsTown;
+    }
+
     public override void AreaChange(AreaInstance area)
     {
         if (!Settings.Enable || area == null) return;
-
         var isMap = !area.IsHideout && !area.IsTown;
-        var mapName = area.Area?.Name ?? area.Area?.Id ?? "Map";
+        _currentMapName = area.Area?.Name ?? area.Area?.Id ?? "Map";
         var now = DateTime.UtcNow;
-
         if (Settings.DebugLogging)
-            LogMessage($"[area] raw='{area.Area?.Id}' name='{area.Area?.Name}' hideout={area.IsHideout} town={area.IsTown} -> isMap={isMap}");
-
-        if (!_sessionActive && isMap && Settings.AutoStartOnFirstMap.Value)
-            StartSession(now);
-
-        if (_sessionActive)
-            _tracker.OnAreaEntered(isMap, mapName, now, Settings.MapCostEx.Value);
+            LogMessage($"[area] name='{area.Area?.Name}' hideout={area.IsHideout} town={area.IsTown} -> isMap={isMap}");
+        _tracker.OnAreaEntered(isMap, _currentMapName, now, Settings.MapCostEx.Value);
     }
 
     public override void Tick()
@@ -57,50 +64,49 @@ public class FarmTracker : BaseSettingsPlugin<Settings>
         if (Settings.ToggleWindowHotkey.PressedOnce())
             Settings.ShowWindow.Value = !Settings.ShowWindow.Value;
 
-        if (!GameController.InGame || !_sessionActive) return;
+        if (!GameController.InGame) return;
 
-        // Seed the baseline as early as possible — at session start, before NinjaPricer prices load —
-        // so loot already in your bags is recorded as not-income and pre-session inventory is captured
-        // before you start looting. Seeding only needs item ids/sizes, not values, so it runs
-        // independent of the prices gate and uses an unfiltered snapshot (min value 0) to capture every id.
+        var snapshot = _reader.Snapshot();   // unfiltered
+
         if (_needSeed)
         {
-            _accumulator.SeedBaseline(_reader.Snapshot(0f));
+            _accumulator.SeedBaseline(snapshot);
             _needSeed = false;
             return;
         }
 
         if (!_bridge.IsAvailable || !_bridge.PricesReady) return;
 
-        var delta = _accumulator.Accumulate(_reader.Snapshot(Settings.MinItemValueEx.Value));
-        _tracker.AddIncome(delta.GainedEx);
-        _tracker.AddUnpriced(delta.NewUnpriced);
+        var now = DateTime.UtcNow;
+        var result = _accumulator.Accumulate(snapshot, InMapNow());
+        // apply the min-value threshold to income/log noise without losing presence tracking (pure + tested)
+        result = LootAccumulator.ApplyMinValue(result, Settings.MinItemValueEx.Value);
+        _tracker.Apply(result, now);
+
+        if ((now - _lastSaveUtc).TotalSeconds >= 10)
+        {
+            _store.Save(_tracker.Session);
+            _lastSaveUtc = now;
+        }
     }
 
     public override void Render()
     {
         if (!Settings.Enable || !Settings.ShowWindow) return;
-
         var now = DateTime.UtcNow;
-        var stats = SessionStats.Compute(_tracker.Session, now);
+        var stats = SessionStats.Compute(_tracker.Session, _tracker.CurrentRun, now);
         var show = true;
         _window.Draw(_tracker, stats, _bridge.DivinePerExalted, _bridge.IsAvailable, _bridge.PricesReady,
-                     Settings, now, onStart: () => StartSession(now), onStop: () => StopSession(now),
-                     onReset: () => StartSession(now), ref show);
+                     Settings.ExpandedByDefault.Value, now, onReset: () => DoReset(now), ref show);
         if (!show) Settings.ShowWindow.Value = false;
     }
 
-    private void StartSession(DateTime now)
+    private void DoReset(DateTime now)
     {
-        _tracker.StartSession(now);
+        var archived = _tracker.Reset(now, InMapNow(), _currentMapName, Settings.MapCostEx.Value);
+        _store.Save(archived);
+        _store.Prune(Settings.MaxStoredSessions.Value);
         _accumulator.Reset();
         _needSeed = true;
-        _sessionActive = true;
-    }
-
-    private void StopSession(DateTime now)
-    {
-        _tracker.StopSession(now);
-        _sessionActive = false;
     }
 }
